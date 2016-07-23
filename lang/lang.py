@@ -52,7 +52,7 @@ Während des Downloads kann man das Programm nicht verwenden.
 
 Mit OK schließen Sie das Fenster"""
     label_shortdesc_teamviewer_download_fertig="Download von Teamviewer Beendet.\nWeiter mit Punkt 3."
-    button_support_teamviewer_start="Starte Fernwartung"
+    button_support_teamviewer_start="Starte Teamviewer"
     label_update="Nach dem Bestätigen startet der Update Prozess"
     label_update_finish="Update Beendet, Bitte starten Sie das Programm neu"
 
@@ -120,7 +120,7 @@ Click OK to close the window""")
     label_update="After Accepts starting the update progress"
     button_support_teamviewer_start="Start Teamviewer"
 
-    label_update_error="Fehler, konnte nicht updaten"
+    label_update_error="Error, update fails"
     label_update_finish="Update finish, please restart the program"
     # Menu Help
     button_help_label="Help"
