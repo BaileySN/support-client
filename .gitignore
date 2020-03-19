@@ -1,3 +1,9 @@
 # pyCharm
 .idea/
+venv/
+venv_python27/
+
+#python
+*.pyc
+*.pyo
 

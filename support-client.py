@@ -1,213 +1,319 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
-#######################################################################################################################
-# Support-Client <https://github.com/BaileySN/Support-Client>.                                                        #
-# Copyright (C) [2015]  [Guenter Bailey]                                                                              #
-#                                                                                                                     #
-# This program is free software;                                                                                      #
-# you can redistribute it and/or modify it under the terms of the GNU General Public License                          #
-# as published by the Free Software Foundation;                                                                       #
-# either version 3 of the License, or (at your option) any later version.                                             #
-#                                                                                                                     #
-# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;                           #
-# without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                           #
-# See the GNU General Public License for more details.                                                                #
-#                                                                                                                     #
-# You should have received a copy of the GNU General Public License along with this program;                          #
-# if not, see <http://www.gnu.org/licenses/>.                                                                         #
-#######################################################################################################################
-import os
-import Tkinter as tk
-from os import curdir, sep
+############################################
+# MIT License Copyright 2020 Günter Bailey #
+############################################
+import tkinter as tk
+from tkinter import Menu
+from tkinter.ttk import Progressbar
+from tkinter import messagebox as mbox
+from gettext import gettext as _
+from bin import __version__, ABOUTPROGRAM, ABOUTTXT, PROGRAM_NAME
+from bin.findenv import get_osname as _osenv
+from bin.license import information
+from os import curdir, sep, path, mkdir
+import threading
 from subprocess import Popen, PIPE
-from tkMessageBox import showinfo
-from lang import de_DE, en_EN
-from conf import setlang, dlsource
-from conf import check as _check
-from bin import osenv as _osenv
+import json
+from datetime import datetime
 
-# set language
-ltrans = ()
-if setlang.langn == "de_DE":
-    ltrans = de_DE()
-elif setlang.langn == "en_EN":
-    ltrans = en_EN()
-else:
-    ltrans = de_DE()
+try:
+    from urllib import urlretrieve
+except ImportError:
+    from urllib.request import urlretrieve
 
-programmtxt = ltrans.programm_name
-savfilent = (curdir + sep + "temp" + sep + dlsource.twsafe_nt)
-savfilelinux = (curdir + sep + "temp" + sep + dlsource.twsafe_linux)
-savfilemacos = (curdir + sep + "temp" + sep + dlsource.twsafe_macos)
-twstart_linux = (curdir + sep + "temp" + sep + "teamviewerqs" + sep + "teamviewer")
+#
+# def onlinehelp():
+#     import webbrowser
+#     webbrowser.open("http://wiki.pratznschutz.com/index.php/Support-Client")
+#
+#
+# def updwebsite():
+#     import webbrowser
+#     webbrowser.open("http://download.bailey-solution.com/Support-Client")
+#
 
-def update_program():
-    from bin import update
-    update.start_updater()
-    ende()
+class App(tk.Tk):
+    def __init__(self, *args, **kwargs):
+        tk.Tk.__init__(self, *args, **kwargs)
+        self.wm_title(f"{PROGRAM_NAME} {__version__}")
+        self.grid_columnconfigure(0, weight=1)
+        self.resizable(True, True)
+        self.config = dict({'version': __version__, 'tmpdir': curdir + sep + 'tmp',
+                            'email': 'office@bailey-solution.com', 'phone': '+43(0)720/517219',
+                            'webpage': 'https://www.bailey-solution.com',
+                            'remote_app': dict({'server': 'https://download.b2go.cloud/Support-Client/bin/',
+                                                'nt': 'TVQS.exe', 'macos': 'TVQS.dmg', 'linux': 'TVQS.exe'}),
+                            'test': dict({'ping': dict({'server': 'google.com', 'repeat': 4, 'result': 'no result',
+                                                        'ip': '8.8.8.8'})
+                                          })
+                            })
 
-def editconfiguration():
-    editor = ''
-    if _osenv() == "nt":
-        editor = 'notepad'
-    elif _osenv() == "linux":
-        editor = 'notepad'
-    elif _osenv == "macos":
-        editor = 'notepad'
-    else:
-        editor = 'notepad'
+        self.setup(load=True)
+        self.check_folder()
+        self.child = None
+        # configuration
+        self.tmpdir = None
+        self.test_ping_server = None
+        self.test_ping_ip = None
+        self.test_ping_repeat = None
+        # start UI
+        self.initUI()
 
-    confopen = [editor, 'conf/config.py']
-    p7 = Popen(confopen, stdout=PIPE)
-    cmdt = p7.communicate()[0]
+    def save_edit_configuration(self):
+        self.config.update({'tmpdir': self.tmpdir.get()})
+        self.config['test']['ping'].update({'server': self.test_ping_server.get(),
+                                            'repeat': int(self.test_ping_repeat.get()),
+                                            'ip': self.test_ping_ip.get()})
 
-def aboutprogram():
-    uebertxt = ltrans.aboutprogram
-    showinfo(programmtxt, uebertxt)
+        if self.setup(write=True):
+            mbox.showinfo(title=f"{PROGRAM_NAME} {__version__}", message=_("Configuration saved"))
+            self.child.destroy()
 
-def onlinehelp():
-    import webbrowser
+    def edit_configuration(self):
+        win = tk.Toplevel()
+        win.wm_title(_(f"{PROGRAM_NAME} {__version__} Edit Configuration"))
+        win.grid_columnconfigure(0, weight=1)
+        win.resizable(True, True)
+        tk.Label(win, text=f"Version {self.config['version']}").grid(row=0, column=0, columnspan=6)
 
-    webbrowser.open("http://wiki.pratznschutz.com/index.php/Support-Client")
+        self.child = win
+        self.tmpdir = tk.StringVar(value=self.config['tmpdir'])
+        tk.Label(win, text=_("Download Directory")).grid(row=1, column=0)
+        tk.Entry(win, bd=2, textvariable=self.tmpdir).grid(row=1, column=1)
 
-def updwebsite():
-    import webbrowser
-    webbrowser.open("http://download.bailey-solution.com/Support-Client")
+        tk.Label(win, text=_("Connection Check Settings")).grid(row=2, column=1, columnspan=6)
 
-def dlfernwartung():
-    import urllib
+        self.test_ping_server = tk.StringVar(value=self.config['test']['ping']['server'])
+        tk.Label(win, text=_("Server")).grid(row=5, column=0)
+        tk.Entry(win, bd=2, textvariable=self.test_ping_server).grid(row=5, column=1)
 
-    tempdir = (curdir + sep + "temp")
-    if not os.path.exists(tempdir):
-        os.makedirs(tempdir)
+        self.test_ping_ip = tk.StringVar(value=self.config['test']['ping']['ip'])
+        tk.Label(win, text=_("IP")).grid(row=10, column=0)
+        tk.Entry(win, bd=2, textvariable=self.test_ping_ip).grid(row=10, column=1)
 
-    if _osenv() == "nt":
-        showinfo(ltrans.button_support_teamviewer_download, ltrans.label_shortdesc_teamviewer_download)
-        urllib.urlretrieve(dlsource.twclient_nt, savfilent)
-        showinfo(ltrans.button_support_teamviewer_download, ltrans.label_shortdesc_teamviewer_download_fertig)
-    elif _osenv() == "linux":
-        showinfo(ltrans.button_support_teamviewer_download, ltrans.label_shortdesc_teamviewer_download)
-        urllib.urlretrieve(dlsource.twclient_linux, savfilelinux)
-        os.system("tar xfz " + savfilelinux + " -C " + curdir + sep + "temp" + sep)
-        showinfo(ltrans.button_support_teamviewer_download, ltrans.label_shortdesc_teamviewer_download_fertig)
-    elif _osenv() == "macos":
-        showinfo(ltrans.button_support_teamviewer_download, ltrans.label_shortdesc_teamviewer_download)
-        urllib.urlretrieve(dlsource.twclient_macos, savfilemacos)
-        showinfo(ltrans.button_support_teamviewer_download, ltrans.label_shortdesc_teamviewer_download_fertig)
-    return 0
+        self.test_ping_repeat = tk.IntVar(value=self.config['test']['ping']['repeat'])
+        tk.Label(win, text=_("Ping Repeat min. 2")).grid(row=20, column=0)
+        tk.Entry(win, bd=2, textvariable=self.test_ping_repeat).grid(row=20, column=1)
 
-def twstart():
-    if _osenv() == "nt":
-        # appstart = [savfilent]
-        p1 = Popen(savfilent)
+        remote_app_server_url = tk.StringVar(value=self.config['remote_app']['server'])
+        remote_app_tv = tk.StringVar(value=self.config['remote_app'][_osenv()])
+        tk.Label(win, text=_("Remote Server")).grid(row=30, column=0)
+        tk.Entry(win, bd=2, state="readonly", textvariable=remote_app_server_url).grid(row=30, column=1)
 
-    elif _osenv() == "linux":
-        # appstart = twstart_linux
-        p1 = Popen(twstart_linux)
+        tk.Label(win, text=_("Program")).grid(row=40, column=0)
+        tk.Entry(win, bd=2, state="readonly", textvariable=remote_app_tv).grid(row=40, column=1)
 
-    elif _osenv() == "macos":
-        appstart = ['open', savfilemacos]
-        p1 = Popen(appstart)
-    return 0
+        tk.Button(win, width=20, height=2, text=_("Close"), command=win.destroy).grid(row=50, column=0)
+        tk.Button(win, width=20, height=2, text=_("Save"), command=self.save_edit_configuration).grid(row=50, column=1)
 
-def ende():
-    main.destroy()
+    def check_folder(self):
+        if not path.exists(self.config['tmpdir']):
+            mkdir(self.config['tmpdir'])
 
-def inetcon():
-    pingopt = ''
+    def setup(self, load=False, write=False):
+        jsonfile = curdir + sep + "config.json"
+        if not path.isfile(jsonfile):
+            with open(jsonfile, "w") as f:
+                f.write(json.dumps(self.config))
 
-    if _osenv() == "nt":
-        pingopt = '-n'
-    elif _osenv() == "linux":
-        pingopt = '-c'
-    elif _osenv() == "macos":
-        pingopt = '-c'
-    else:
-        pingopt = '-c'
+        if load:
+            with open(jsonfile, "r") as f:
+                cfg = json.loads(f.read())
+            if self.config['version'] > cfg.get('version', '0.1a'):
+                with open(jsonfile, "w") as f:
+                    f.write(json.dumps(self.config))
+            else:
+                self.config.update(cfg)
+        elif write:
+            with open(jsonfile, "w") as f:
+                f.write(json.dumps(self.config))
+        return True
 
-    if os.system("ping " + pingopt + " " + _check.rate + " " + _check.pingurl) == 0:
-        lb2["text"] = ltrans.display_connection_true
-        lb2["bg"] = "#00FF00"
-    else:
-        lb2["text"] = ltrans.display_connection_false
-        lb2["bg"] = "#FF0000"
-    return 0
+    def initUI(self):
+        self.windows = []
+        label = tk.Label(self, text=PROGRAM_NAME)
+        label["font"] = "Courier 14 italic"
+        label["height"] = 1
+        label["width"] = 25
+        label["borderwidth"] = 2
+        label["relief"] = "ridge"
+        label["fg"] = "#000000"
+        label["anchor"] = "center"
+        label.grid(row=0, column=0, columnspan=6)
 
-def helpsteps():
-    showinfo(ltrans.button_help_steps, ltrans.programm_description)
+        self.logo = tk.PhotoImage(file=curdir + sep + "bin" + sep + "image" + sep + "support-client.gif")
+        self.Artwork = tk.Label(self, compound=tk.TOP,
+                                text=_("press the button \nstart remote support and \ntell the support the"
+                                       " \nTeamviewer ID and Password.\n"), font="Courier 12", anchor="center",
+                                fg="#000000", image=self.logo).grid(row=1, column=0, columnspan=5, sticky="N",
+                                                                    rowspan=2)
+        tk.Label(self, text=_(f"Tech Support \n Phone: {self.config['phone']}\n E-Mail: {self.config['email']}"),
+                 font="Courier 12", anchor="center", fg="#000000").grid(row=4, column=0, columnspan=5, sticky="N")
+
+        menubar = Menu(self.master)
+        dateimenu = Menu(menubar)
+        supportmenu = Menu(menubar)
+        helpmenu = Menu(menubar)
+        self.configure(menu=menubar)
+
+        menubar.add_cascade(label=_("File"), menu=dateimenu)
+        dateimenu.add_command(label=_("Edit Configuration"), command=self.edit_configuration)
+        dateimenu.add_command(label=_("Close"), command=self.quit)
+
+        menubar.add_cascade(label=_("Support"), menu=supportmenu)
+        supportmenu.add_command(label=_("Check Internet Connection"), command=self.ping_tool)
+        supportmenu.add_command(label=_("Start Remotesupport"), command=self.tw_start)
+        supportmenu.add_command(label=_("Download Remotetool"), command=self.download_supporttool)
+        supportmenu.add_separator()
+
+        menubar.add_cascade(label=_("Help"), menu=helpmenu)
+        helpmenu.add_command(label=_(f"About {PROGRAM_NAME}"), command=self.about_program)
+        helpmenu.add_separator()
+        helpmenu.add_command(label=_("License"), command=self.show_license)
+        helpmenu.add_command(label=_("Manual"), command=self.manual)
+        helpmenu.add_command(label=_("Update"), command=self.update_program)
+
+        tk.Label(self, text='').grid(row=5, column=0)
+
+        self.conntestlb = tk.Label(self)
+        self.conntestlb["text"] = _("Internet Connection ?")
+        self.conntestlb["bg"] = "#ffa500"
+        self.conntestlb["font"] = "Courier 12"
+        self.conntestlb["height"] = 2
+        self.conntestlb["width"] = 22
+        self.conntestlb["relief"] = "ridge"
+        self.conntestlb["fg"] = "#000000"
+        self.conntestlb["anchor"] = "center"
+        self.conntestlb.grid(column=0, row=6, columnspan=6)
+
+        tk.Label(self, text='').grid(row=15, column=0)
+        self.progressbar = Progressbar(self, orient='horizontal', length=260, mode='indeterminate')
+        self.progressbar.grid(row=18, column=0, columnspan=3)
+        self.progressbar.grid_forget()
+
+        tk.Label(self, text='').grid(row=20, column=0)
+        tk.Button(self, width=20, height=2, text=_("Start Remotesupport"), command=self.tw_start).grid(row=25, column=0)
+        tk.Label(self, text='').grid(row=30, column=0)
+        tk.Button(self, width=20, height=2, text=_("Close"), command=self.quit).grid(row=50, column=0)
+        tk.Label(self, text='').grid(row=60, column=0)
+
+        tk.Label(self, text=f"Bailey-Solution @{datetime.now().year}").grid(row=70, column=0, columnspan=2)
+
+    def download_supporttool(self, parentprocess=True):
+        def download():
+            if parentprocess:
+                self.progressbar.grid(row=18, column=0, columnspan=3)
+                self.progressbar.start()
+            try:
+                self.check_folder()
+                urlretrieve(url=f"{self.config['remote_app']['server']}{self.config['remote_app'][_osenv()]}",
+                            filename=f"{self.config['tmpdir']}{sep}{self.config['remote_app'][_osenv()]}")
+                if parentprocess:
+                    mbox.showinfo(title=_("Download"), message=_(f"Image {self.config['remote_app'][_osenv()]} downloaded"))
+            except Exception as exp:
+                print("exception = ", exp)
+                mbox.showwarning(title=_("Download Error"), message=exp)
+            if parentprocess:
+                self.progressbar.stop()
+                self.progressbar.grid_forget()
+            return True
+        if parentprocess:
+            threading.Thread(target=download).start()
+        else:
+            download()
+        return True
+
+    def tw_start(self):
+        def start():
+            self.progressbar.grid(row=18, column=0, columnspan=3)
+            self.progressbar.start()
+            try:
+                fpath = self.config.get('tmpdir', curdir+sep+'tmp')
+                if not path.isfile(f"{fpath}{sep}{self.config['remote_app'][_osenv()]}"):
+                    self.download_supporttool(parentprocess=False)
+                appstart = None
+                if _osenv() == "nt":
+                    appstart = [fpath+sep+self.config['remote_app'][_osenv()]]
+                elif _osenv() == "macos":
+                    appstart = ['open', fpath+sep+self.config['remote_app'][_osenv()]]
+
+                if appstart:
+                    Popen(appstart)
+                else:
+                    mbox.showwarning(title=_("Start Remotesupport"), message=_("Programm not found"))
+            except Exception as exp:
+                print("error = ", exp)
+                mbox.showwarning(title=_("Start Remotesupport"), message=str(exp))
+            self.progressbar.stop()
+            self.progressbar.grid_forget()
+            return True
+        threading.Thread(target=start).start()
+        return True
+
+    def ping_tool(self):
+        def ping():
+            self.progressbar.grid(row=18, column=0, columnspan=3)
+            self.progressbar.start()
+            try:
+                self.conntestlb["bg"] = "#00FF00"
+                self.conntestlb["text"] = _("Check Running...")
+                cmd = ['ping']
+                if _osenv() == "nt":
+                    cmd.append('-n')
+                elif _osenv() in ["linux", "macos"]:
+                    cmd.append('-c')
+                else:
+                    cmd.append('-c')
+
+                cmd1 = cmd
+                cmd1.append(str(self.config['test']['ping']['repeat']))
+                cmd1.append(self.config['test']['ping']['ip'])
+                p1 = Popen(cmd1, stdout=PIPE)
+                result, error = p1.communicate()
+                if error:
+                    self.conntestlb["bg"] = "#FF0000"
+                    self.conntestlb["text"] = _("DNS error")
+
+                cmd2 = cmd
+                cmd2.append(str(self.config['test']['ping']['repeat']))
+                cmd2.append(self.config['test']['ping']['server'])
+                p2 = Popen(cmd2, stdout=PIPE)
+                result2, error2 = p2.communicate()
+                if error2:
+                    self.conntestlb["bg"] = "#FF0000"
+                    self.conntestlb["text"] = _("no connection")
+
+                if error or error2:
+                    mbox.showwarning(title=_("Ping Error"), message=f"{error}\n{error2}")
+                else:
+                    self.conntestlb["bg"] = "#00FF00"
+                    self.conntestlb["text"] = _("connection OK")
+                    mbox.showinfo(title=_("Ping Successful"), message=_("Ping Successful"))
+            except Exception as exp:
+                print("exception = ", exp)
+                mbox.showwarning(title=_("Error on PING Command"), message=exp)
+            self.progressbar.stop()
+            self.progressbar.grid_forget()
+            return True
+        threading.Thread(target=ping).start()
+
+    def manual(self):
+        desc = _("To start the Remoteconnection for Tech Support, klick on Start Remotesupport.")
+        mbox.showinfo(title=_("Manual"), message=desc)
+
+    def show_license(self):
+        mbox.showinfo(title=_("License"), message=information)
+
+    def about_program(self):
+        mbox.showinfo(title=_(f"About {PROGRAM_NAME}"), message=ABOUTPROGRAM)
+
+    def update_program(self):
+        # from bin import update
+        # update.start_updater()
+        mbox.showinfo(title=f"Update {PROGRAM_NAME} {__version__}", message=_("feature is comming soon."))
 
 
-# Main Window
-main = tk.Tk()
-# window Title
-main.wm_title(ltrans.programm_name)
-
-main.grid_columnconfigure(0, weight=1)
-main.resizable(True, True)
-
-# dropdown Menu
-menu = tk.Menu(main)
-main.config(menu=menu)
-dateimenu = tk.Menu(menu)
-menu.add_cascade(label=ltrans.button_filemenu_label, menu=dateimenu)
-
-if _osenv() != 'nt':
-    dateimenu.add_command(label=ltrans.button_config_editconf, command=editconfiguration)
-
-dateimenu.add_separator()
-dateimenu.add_command(label=ltrans.button_filemenu_end, command=ende)
-
-toolmenu = tk.Menu(menu)
-menu.add_cascade(label=ltrans.button_support_label, menu=toolmenu)
-toolmenu.add_command(label=ltrans.button_connection, command=inetcon)
-toolmenu.add_separator()
-toolmenu.add_command(label=ltrans.button_support_teamviewer_download, command=dlfernwartung)
-toolmenu.add_command(label=ltrans.button_support_teamviewer_start, command=twstart)
-
-hilfemenu = tk.Menu(menu)
-menu.add_cascade(label=ltrans.button_help_label, menu=hilfemenu)
-hilfemenu.add_command(label=ltrans.button_help_steps, command=helpsteps)
-hilfemenu.add_command(label=ltrans.button_help_online, command=onlinehelp)
-hilfemenu.add_command(label=ltrans.button_update, command=update_program)
-hilfemenu.add_separator()
-hilfemenu.add_command(label=ltrans.button_help_aboutus, command=aboutprogram)
-hilfemenu.add_command(label=ltrans.button_to_update_url, command=updwebsite)
-
-#Image
-imglogo = tk.PhotoImage(file=curdir + sep + "bin" + sep + "image" + sep + "support-client.gif")
-
-# Label
-lbapp = tk.Label(main, text=programmtxt)
-lbapp["font"] = "Courier 14 italic"
-lbapp["height"] = 1
-lbapp["width"] = 25
-lbapp["borderwidth"] = 2
-lbapp["relief"] = "ridge"
-lbapp["fg"] = "#000000"
-lbapp["anchor"] = "center"
-lbapp.grid(column=0, row=0, columnspan=6)
-
-lbspace = tk.Label(main, compound=tk.TOP, text=ltrans.programm_shortdesc, font="Courier 12", anchor="center",
-                   fg="#000000", image=imglogo).grid(column=0, row=3, columnspan=6)
-
-lb2 = tk.Label(main)
-lb2["text"] = ltrans.display_connection
-lb2["bg"] = "#ffa500"
-lb2["font"] = "Courier 12"
-lb2["height"] = 2
-lb2["width"] = 22
-lb2["relief"] = "ridge"
-lb2["fg"] = "#000000"
-lb2["anchor"] = "center"
-lb2.grid(column=0, row=6, columnspan=6)
-
-b_ende = tk.Button(main, text=ltrans.button_filemenu_end, command=ende, height=3, width=12).grid(column=0, row=12,
-                                                                                                 columnspan=6)
-b_chkdb = tk.Button(main, text=ltrans.button_connection, command=inetcon, height=3, width=25).grid(column=0, row=7,
-                                                                                                   columnspan=6)
-b_dlremotecontrol = tk.Button(main, text=ltrans.button_support_teamviewer_download, command=dlfernwartung, height=3,
-                              width=25).grid(column=0, row=9, columnspan=6)
-b_startremotecontrol = tk.Button(main, text=ltrans.button_support_teamviewer_start, command=twstart, height=3,
-                                 width=25).grid(column=0, row=11, columnspan=6)
-
-main.mainloop()
+if __name__ == "__main__":
+    app = App()
+    app.mainloop()

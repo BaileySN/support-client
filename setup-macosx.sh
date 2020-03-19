@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 
-
 sfile="support-client.command"
-ver="0.9.5"
+ver="1.0a"
 sfcontent="""
 ##############################################################################################################################
 # Support-Client <http://wiki.pratznschutz.com/index.php/Support-Client>.                                                    #
-# Copyright (C) [2015]  [Guenter Bailey]                                                                                     #
+# Copyright @ 2020  [Guenter Bailey]                                                                                     #
 #                                                                                                                            #
 # This program is free software;                                                                                             #
 # you can redistribute it and/or modify it under the terms of the GNU General Public License                                 #
@@ -26,14 +25,14 @@ echo """
 ##############################################################################################
 #                                  Support-Client setup v$ver                                 #
 #--------------------------------------------------------------------------------------------#
-#                                         by BS @2015                                        #
+#                                         by BS @2020                                        #
 #--------------------------------------------------------------------------------------------#
 #    this tool configure the $sfile for easy starting the program     #
 ##############################################################################################
     """
 echo """
 ###########################################################################################
-# Support-Client v$ver  Copyright (C) 2015  Guenter Bailey                                 #
+# Support-Client v$ver  Copyright (C) 2020  Guenter Bailey                                 #
 # This program comes with ABSOLUTELY NO WARRANTY.                                         #
 # This is free software, and you are welcome to redistribute it under certain conditions. #
 ###########################################################################################
