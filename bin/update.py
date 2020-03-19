@@ -1,38 +1,16 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
-##############################################################################################################################
-# Support-Client <http://wiki.pratznschutz.com/index.php/Support-Client>.                                                    #
-# Copyright (C) [2015]  [Guenter Bailey]                                                                                     #
-#                                                                                                                            #
-# This program is free software;                                                                                             #
-# you can redistribute it and/or modify it under the terms of the GNU General Public License                                 #
-# as published by the Free Software Foundation;                                                                              #
-# either version 3 of the License, or (at your option) any later version.                                                    #
-#                                                                                                                            #
-# This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;                                  #
-# without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.                                  #
-# See the GNU General Public License for more details.                                                                       #
-#                                                                                                                            #
-# You should have received a copy of the GNU General Public License along with this program;                                 #
-# if not, see <http://www.gnu.org/licenses/>.                                                                                #
-##############################################################################################################################
-import os,zipfile,shutil
+import os
+import zipfile
+import shutil
 from os import curdir,sep
-from tkMessageBox import showinfo,showerror
-from bin import osenv as _osenv
-from lang import de_DE, en_EN
-from conf import setlang
-from conf import check as _check
+from tkinter.messagebox import showinfo, showerror
+from .findenv import get_osname as _osenv
+from gettext import gettext as _
+from subprocess import Popen, PIPE
 
 support_cldir = "support-client"
 
-ltrans = ()
-if setlang.langn == "de_DE":
-    ltrans = de_DE()
-elif setlang.langn == "en_EN":
-    ltrans = en_EN()
-else:
-    ltrans = de_DE()
 
 def chk_connection():
     pingopt = ''
@@ -52,6 +30,7 @@ def chk_connection():
         stat = "Error"
     return stat
 
+
 def forceMergeFlatDir(srcDir, dstDir):
     if not os.path.exists(dstDir):
         os.makedirs(dstDir)
@@ -60,9 +39,11 @@ def forceMergeFlatDir(srcDir, dstDir):
         dstFile = os.path.join(dstDir, item)
         forceCopyFile(srcFile, dstFile)
 
+
 def forceCopyFile (sfile, dfile):
     if os.path.isfile(sfile):
         shutil.copy2(sfile, dfile)
+
 
 def isAFlatDir(sDir):
     for item in os.listdir(sDir):
@@ -70,6 +51,7 @@ def isAFlatDir(sDir):
         if os.path.isdir(sItem):
             return False
     return True
+
 
 def copyTree(src, dst):
     for item in os.listdir(src):
@@ -86,17 +68,20 @@ def copyTree(src, dst):
             else:
                 forceMergeFlatDir(s, d)
 
+
 def msdelupdate(srcDir):
     try:
         os.system("rmdir /s /q "+srcDir+sep)
     except:
         print("fehler bei update delete")
 
+
 def mscopy(srcDir, dstDir):
     try:
         os.system("xcopy "+srcDir+sep+"*"+" "+dstDir+" /Y /E")
     except IOError:
         print("xcopy fehler")
+
 
 def extract(fpath, fname):
     ext = (fpath+sep+fname)
@@ -115,16 +100,12 @@ def extract(fpath, fname):
 
 
 class start_updater():
-    def __init__(self):
-        if _osenv() == "nt":
-            updname = "scupdate_win.zip"
-        else:
-            updname = "scupdate_linux.zip"
-
-        self.url = ("http://download.bailey-solution.com/Support-Client/"+updname)
-        self.dldir = (curdir+sep+"temp"+sep+"update")
+    def __init__(self, config):
+        self.cfg = config
+        self.url = f"{config['remote_app']['server']}/{config['remote_app'][_osenv()]}"
+        self.dldir = f"{config['tmpdir']}{sep}update"
         self.fname = self.url.split('/')[-1]
-        if chk_connection() == "OK":
+        if self.check_connection():
             try:
                 self.dlprogram()
                 extract(self.dldir, self.fname)
@@ -134,8 +115,26 @@ class start_updater():
         else:
             showerror(ltrans.programm_name, ltrans.label_update_error)
 
+    def check_connection(self):
+        cmd = ['ping']
+        if _osenv() == "nt":
+            cmd.append('-n')
+        elif _osenv() in ["linux", "macos"]:
+            cmd.append('-c')
+        else:
+            cmd.append('-c')
+        cmd.append(self.cfg['test']['ping']['repeat'])
+        cmd.append(self.cfg['test']['ping']['server'])
+        p1, error = Popen(cmd, stdout=PIPE)
+        if not error:
+            return True
+        else:
+            return False
+
     def dlprogram(self):
+        import urllib
         import urllib2
+
         if not os.path.exists(self.dldir):
             os.makedirs(self.dldir)
 
